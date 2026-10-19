@@ -12,13 +12,18 @@
 
 ## 二、三条设计原则
 
-### 1. 状态要注入，不要"请求"
+### 1. 状态要能被"问"，而不是只能被"记"
 
 两个已有的科研插件（`dsh-science`、`dsh-science-workbench`）都靠"模型自觉调用 `research_state` / `bio_get_project`"来维持状态。一旦模型这一轮没调，状态就断——而且模型无从知道自己断了。
 
-DSH 的 `systemPrompt.context` 在**每次模型步**都会重新渲染，并以 "This snapshot supersedes earlier runtime-context snapshots" 的语义替换旧快照。于是状态存在性不再依赖模型的主动性。
+修法有两条，v0 选了第一条，v0.2 改成了第二条：
 
-这个 callback 拿不到 agent？——拿得到。`assembleContextFor(agent, signal)` 返回 `{ agent, scope: agent, ... }`，全局注册的 context 对每个 agent 都会收到它。
+- （v0，已降级为可选）`systemPrompt.context` 在**每次模型步**重新渲染，以 "This snapshot supersedes earlier runtime-context snapshots" 的语义替换旧快照，状态不再依赖模型主动性。
+- （v0.2，默认）**人类按需问**：`/where` 一条命令回答"跑到哪了、结果在哪、路径是什么"。便宜、不占 token、不依赖模型。
+
+结论：注入是**冷启动的补丁**，不是日常的主力。见「三点五、v0.2 修正」。
+
+这个 callback 拿不到 agent？——拿得到。`assembleContextFor(agent, signal)` 返回 `{ agent, scope: agent, ... }`，全局注册的 context 对每个 agent 都会收到它（v0.2 起同时接受 `assembly.agent` 与 `assembly.scope`，因为类型声明里只写了 `scope`）。
 
 ### 2. 台账要由事件写，不要由模型写
 
@@ -36,7 +41,8 @@ DSH 的 `systemPrompt.context` 在**每次模型步**都会重新渲染，并以
 
 | 文件 | 角色 | 写入方式 | 理由 |
 |---|---|---|---|
-| `sci/STATE.md` | 当前状态快照 | 唯一允许整体重写；<= 45 行 / 1800 字 | 它会进每一步的上下文，必须小且必须是最新的 |
+| `sci/STATE.md` | 当前状态快照 | 唯一允许整体重写；<= 45 行 / 1800 字 | `inject=full` 时它会进上下文，必须小且最新 |
+| `sci/config.json` | 注入开关 | `/inject` 写 | 让"重不重"由项目自己决定，改完立即生效 |
 | `sci/log/<日期>.md` | 会话日志 | 只追加 | 追加 = 天然版本化 |
 | `sci/dead-ends.md` | 死路台账 | 只追加 | 失败信息一旦被"整理"就会失真 |
 | `sci/ledger/*.jsonl` | 工具台账 | 仅插件写 | 机器事实，人不该编辑 |
@@ -44,6 +50,29 @@ DSH 的 `systemPrompt.context` 在**每次模型步**都会重新渲染，并以
 | `sci/state-history/` | 快照归档 | 仅 `/wrap` 写 | 让"重写"也可追溯 |
 
 **核心规则：分析文档、方案文档、论文稿只允许追加节，不允许整体重写。** 这条写进了 skill，因为它正是 295 次重写的直接成因。
+
+## 三点五、v0.2 修正：默认不注入
+
+v0 的论点是"状态要注入，不要请求"，默认每一步注入完整 STATE（约 500 字）。第一次实跑被否掉了：
+
+> "我好像也不需要，太重，有时只是看任务跑到哪了，结果文件分析，数据保存路径。"
+
+这条反馈把两件事分开了：
+
+| 需求 | 频率 | 正确载体 |
+|---|---|---|
+| 我做到哪了、结果在哪、路径是什么 | 几乎每次 | **`/where`**（按需、便宜、不占 token） |
+| 这个项目的科学判断是什么、哪条路已经死了 | 冷启动 / 换分支 / 长期回归 | `sci/STATE.md` 与 `/resume` |
+
+把第二件事塞进每一步的上下文，等于为低频需求付高频成本。所以 v0.2：
+
+- 默认 `inject: "off"`；
+- `brief` 一行（~100 字）、`full` 只在前 2 步给全文然后回落；
+- 开关写在 `sci/config.json`，`/inject` 改，**不需要重启**；
+- 新增 `/where` 承担高频问题：今日台账尾部、最近产物（按 mtime）、疑似作业命令、关键路径，最后附一行**注入自检**（渲染次数、agent/cwd/sci 是否解析到、错误）。
+
+保留的教训不是"注入错"，而是"**默认值错**"：注入解决的是冷启动失忆，不是日常定位。
+
 
 ## 四、为什么记 branch
 
