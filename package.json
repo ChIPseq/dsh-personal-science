@@ -1,0 +1,39 @@
+{
+  "name": "dsh-personal-science",
+  "version": "0.1.0",
+  "description": "Personal-science layer for DeepSeek Harness: session-injected research state, append-only ledger, dead-ends and branch bookkeeping. Zero new agent tools — the model keeps using native DSH capabilities.",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.mjs",
+    "lib",
+    "skills",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "test": "node test/smoke.mjs"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "science",
+    "research",
+    "memory",
+    "provenance"
+  ]
+}

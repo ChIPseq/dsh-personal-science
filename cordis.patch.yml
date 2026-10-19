@@ -1,0 +1,8 @@
+# dsh-personal-science bundle patch.
+#
+# One row over the empty profile root. The Host half mounts here; it registers
+# NO agent tools — only a runtime-context injection, four human commands, a
+# tools/result ledger listener, and a branch recorder.
+- insert:
+    - id: personal-science
+      name: dsh-personal-science
