@@ -115,6 +115,11 @@ async function main () {
   invoke('inject', 'full')
   const dFull = await render()
   ok(dFull.includes('研究状态'), 'full injection includes the state digest')
+  const injTolerant = invoke('inject', 'brief\n测试这是误带进来的下一句话')
+  ok(injTolerant.kind === 'success', 'arg with a trailing line/text is still accepted')
+  ok(injTolerant.text.includes('brief'), 'tolerant parse reported the brief mode')
+  const injCycle = invoke('inject')
+  ok(injCycle.kind === 'success' && injCycle.text.includes('→'), 'no-arg /inject cycles the mode')
 
   console.log('\nledger')
   emit('tools/result', { name: 'pwsh', agent: { id: 'session-main' }, arguments: { command: 'sbatch run.sh' } }, { isError: false })

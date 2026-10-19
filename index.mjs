@@ -67,7 +67,7 @@ export function apply (ctx) {
   const skills = ctx.get('skills')
 
   // Self-report surface for `/where`: tells us exactly why a render was empty.
-  const diag = { calls: 0, at: 0, mode: 'off', agent: false, root: null, sci: false, len: 0, error: null }
+  const diag = { calls: 0, at: 0, mode: 'off', agent: false, root: null, sci: false, len: 0, error: null, preview: '' }
 
   // ── 1. Runtime-context injection (opt-in) ────────────────────────────────
   //
@@ -131,6 +131,7 @@ export function apply (ctx) {
         out = parts.filter(Boolean).join('\n')
       }
       diag.len = out.length
+      diag.preview = out.slice(0, 160)
       if (!out) return base
       return { ...base, contexts: [...(base.contexts || []), { name: 'personal-science-state', text: out }] }
     } catch (err) {

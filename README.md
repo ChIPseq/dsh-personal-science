@@ -13,7 +13,7 @@
 | `/wrap [结论]` | 收尾记账：台账折叠进 `sci/log/`，机械更新 STATE 的「停在哪里」并归档旧版 |
 | `/deadend <…>` | 记一条"试过但不行"的路线（append-only） |
 | `/branch [方向]` | 看探索分支树；带参数记录当前分支要验证什么 |
-| `/inject off\|brief\|full` | 自动注入开关（**默认 off**，写 `sci/config.json`，立即生效不需重启） |
+| `/inject` | 自动注入开关：**不带参数就是循环切换**（off→brief→full），也可 `/inject off\|brief\|full`。默认 off，写 `sci/config.json`，立即生效不需重启 |
 
 ## 自动部分（模型零配合）
 
