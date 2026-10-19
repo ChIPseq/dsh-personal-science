@@ -3,3 +3,4 @@ _refs/
 _analysis/
 *.log
 .DS_Store
+_*.mjs

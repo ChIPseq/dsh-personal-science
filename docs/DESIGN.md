@@ -73,6 +73,29 @@ v0 的论点是"状态要注入，不要请求"，默认每一步注入完整 ST
 
 保留的教训不是"注入错"，而是"**默认值错**"：注入解决的是冷启动失忆，不是日常定位。
 
+### 为什么最终不走 `systemPrompt.context()`
+
+第一次实测：注册不报错，但 `/where` 自检显示 `渲染 0 次`——回调从未被调用。
+
+读 DSH 源码得到原因：`context()` 的实现是
+
+```js
+return this.layers.effect(this.ctx, (layer) => layer.contexts.insert(...))
+```
+
+`this.ctx` 是 **SystemPrompt 服务实例**所在的上下文，注册落到那个实例自己的作用域层。而 `dsh-web-app` 对 `system-prompt` 这一行有 override（bundle 列表里的 `overrides` 就包含它），于是 bundle 插件绑到一个实例、agent loop 从另一个实例组装——条目录进了没人读的那一层。
+
+改走 `system-prompt/assemble` waterfall：它是 ctx 上的事件，每次组装都会派发给所有监听者，与实例、与层都无关，`context.agent` 也在形参里。插件直接往 `assembly.contexts` 追加一条：
+
+```js
+ctx.on('system-prompt/assemble', async (assembly, context, next) => {
+  const base = await next()
+  return { ...base, contexts: [...base.contexts, { name: 'personal-science-state', text }] }
+})
+```
+
+代价：这条路径没有"scoped 覆盖 global"语义，也不参与 `order` 排序（追加在末尾）。对一行状态来说无所谓。
+
 
 ## 四、为什么记 branch
 

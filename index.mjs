@@ -24,8 +24,10 @@ import { registerCommands } from './lib/commands.mjs'
 
 export const name = 'personal-science'
 
-// Hard requirements only; every other service is looked up lazily.
-export const inject = ['systemPrompt', 'commands']
+// Hard requirements only; every other service is looked up lazily. Note that
+// the prompt hook is an *event* (`system-prompt/assemble`), not the
+// `systemPrompt` service — see the comment at the injection site.
+export const inject = ['commands']
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
@@ -68,69 +70,75 @@ export function apply (ctx) {
   const diag = { calls: 0, at: 0, mode: 'off', agent: false, root: null, sci: false, len: 0, error: null }
 
   // ── 1. Runtime-context injection (opt-in) ────────────────────────────────
-  try {
-    ctx.systemPrompt.context({
-      name: 'personal-science-state',
-      order: 55,
-      text: (assembly) => {
-        diag.calls += 1
-        diag.at = Date.now()
-        try {
-          // `assembleContextFor(agent)` sets both `agent` and `scope` to the
-          // live Agent; accept either so a call site that only passes scope
-          // still resolves.
-          const agent = (assembly && (assembly.agent || assembly.scope)) || null
-          diag.agent = Boolean(agent && agent.id)
-          if (!diag.agent) {
-            diag.len = 0
-            return ''
-          }
-          const root = resolveProjectRoot(sessions, agent)
-          diag.root = root
-          diag.sci = hasSci(root)
-          if (!diag.sci) {
-            diag.len = 0
-            return ''
-          }
+  //
+  // WHY NOT `systemPrompt.context()`: that API writes through
+  // `layers.effect(this.ctx, ...)`, i.e. into the scope layer owned by the
+  // SystemPrompt *service instance the caller is bound to*. The web-app bundle
+  // overrides the `system-prompt` row, so a bundle plugin can end up holding a
+  // different instance than the one the agent loop assembles from: registration
+  // succeeds, the callback is never invoked (measured: 0 renders). The
+  // `system-prompt/assemble` waterfall is an event on ctx, so every assembly
+  // reaches us regardless of which instance or layer runs it.
+  ctx.on('system-prompt/assemble', async (assembly, context, next) => {
+    let base
+    try {
+      base = await next()
+    } catch (err) {
+      diag.error = String((err && err.message) || err)
+      throw err
+    }
 
-          const cfg = readConfig(root)
-          diag.mode = cfg.inject
-          if (cfg.inject === 'off') {
-            diag.len = 0
-            return ''
-          }
-
-          const n = (seen.get(agent.id) || 0) + 1
-          seen.set(agent.id, n)
-
-          let out
-          if (cfg.inject === 'full' && n <= (cfg.fullSteps || 2)) {
-            const parts = [stateDigest(root)]
-            const l = ledgerLine(root)
-            if (l) parts.push(l)
-            const b = branchNote(sessions, agent, root)
-            if (b) parts.push(b)
-            out = parts.join('\n\n')
-          } else {
-            const parts = [stateBrief(root, cfg.briefChars || 120)]
-            const l = ledgerLine(root)
-            if (l) parts.push(l)
-            const b = branchNote(sessions, agent, root)
-            out = parts.filter(Boolean).join('\n')
-          }
-          diag.len = out.length
-          return out
-        } catch (err) {
-          diag.error = String((err && err.message) || err)
-          diag.len = 0
-          return ''
-        }
+    diag.calls += 1
+    diag.at = Date.now()
+    try {
+      const agent = (context && (context.agent || context.scope)) || null
+      diag.agent = Boolean(agent && agent.id)
+      if (!diag.agent) {
+        diag.len = 0
+        return base
       }
-    })
-  } catch (err) {
-    diag.error = `register: ${(err && err.message) || err}`
-    ctx.logger?.warn?.(`[personal-science] context registration failed: ${(err && err.message) || err}`)
-  }
+      const root = resolveProjectRoot(sessions, agent)
+      diag.root = root
+      diag.sci = hasSci(root)
+      if (!diag.sci) {
+        diag.len = 0
+        return base
+      }
+
+      const cfg = readConfig(root)
+      diag.mode = cfg.inject
+      if (cfg.inject === 'off') {
+        diag.len = 0
+        return base
+      }
+
+      const n = (seen.get(agent.id) || 0) + 1
+      seen.set(agent.id, n)
+
+      let out
+      if (cfg.inject === 'full' && n <= (cfg.fullSteps || 2)) {
+        const parts = [stateDigest(root)]
+        const l = ledgerLine(root)
+        if (l) parts.push(l)
+        const b = branchNote(sessions, agent, root)
+        if (b) parts.push(b)
+        out = parts.join('\n\n')
+      } else {
+        const parts = [stateBrief(root, cfg.briefChars || 120)]
+        const l = ledgerLine(root)
+        if (l) parts.push(l)
+        const b = branchNote(sessions, agent, root)
+        out = parts.filter(Boolean).join('\n')
+      }
+      diag.len = out.length
+      if (!out) return base
+      return { ...base, contexts: [...(base.contexts || []), { name: 'personal-science-state', text: out }] }
+    } catch (err) {
+      diag.error = String((err && err.message) || err)
+      diag.len = 0
+      return base
+    }
+  })
 
   // ── 2. Human commands ────────────────────────────────────────────────────
   try {
