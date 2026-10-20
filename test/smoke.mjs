@@ -204,6 +204,11 @@ async function main () {
     signal: new AbortController().signal
   })
   ok(bareResult.kind === 'success', 'an agent without steer/inject still runs the command')
+  const beforeOther = deliveryCount()
+  const otherBox = await invoke('inbox', '', 'session-other')
+  ok(otherBox.kind === 'error', 'a project without sci/ refuses /inbox')
+  ok(deliveryCount() === beforeOther + 1, 'even a refusal is delivered to the human')
+  ok(lastDelivery().text.includes('先运行'), 'the refusal explains how to opt in')
 
   console.log('\n/wrap')
   const w = await invoke('wrap', '证实了 A')
