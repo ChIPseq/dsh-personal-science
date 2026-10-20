@@ -3,7 +3,7 @@
 //
 //   node test/smoke.mjs
 
-import { existsSync, mkdtempSync, readFileSync, rmSync, readdirSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
@@ -90,7 +90,7 @@ function invoke (name, rawInput = '', agentId = 'session-main') {
 async function main () {
   console.log('apply()')
   apply(ctx)
-  ok(commands.size === 6, 'registered 6 commands')
+  ok(commands.size === 7, 'registered 7 commands')
   ok(skills.length === 1 && skills[0].name === 'personal-science', 'registered the skill')
   ok((listeners.get('system-prompt/assemble') || []).length === 1, 'hooked the assemble waterfall')
 
@@ -139,6 +139,25 @@ async function main () {
   ok(w0.text.includes('sbatch run.sh'), '/where shows the submitted job')
   ok(w0.text.includes('注入自检'), '/where reports injection diagnostics')
   ok(!w0.text.includes('## 科学问题'), '/where does not dump the whole STATE')
+
+  console.log('\n/inbox')
+  const box = path.join(root, 'inbox')
+  ok(existsSync(path.join(box, 'README.md')) && existsSync(path.join(box, '.gitignore')), 'inbox scaffolded by /resume')
+  const emptyBox = await invoke('inbox')
+  ok(emptyBox.text.includes('收件箱（空）'), 'empty inbox reports empty')
+  writeFileSync(path.join(box, '20261019_综述.pdf'), 'x')
+  writeFileSync(path.join(box, 'matrix.csv'), 'a,b\n1,2\n')
+  const listed = await invoke('inbox')
+  ok(listed.text.includes('2 个待处理'), 'inbox counts pending files')
+  ok(listed.text.includes('papers/pdf/'), 'pdf is suggested to papers/')
+  ok(listed.text.includes('data/'), 'csv is suggested to data/')
+  ok(listed.text.includes('处理 inbox'), 'inbox prints a ready-to-send instruction')
+  const wInbox = await invoke('where')
+  ok(wInbox.text.includes('收件箱：**2 个待处理**'), '/where surfaces the pending inbox count')
+  rmSync(path.join(box, '20261019_综述.pdf'))
+  rmSync(path.join(box, 'matrix.csv'))
+  const cleared = await invoke('inbox')
+  ok(cleared.text.includes('收件箱（空）'), 'emptying the folder returns to empty')
 
   console.log('\n/wrap')
   const w = await invoke('wrap', '证实了 A')

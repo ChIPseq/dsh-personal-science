@@ -14,6 +14,26 @@
 | `/deadend <…>` | 记一条"试过但不行"的路线（append-only） |
 | `/branch [方向]` | 看探索分支树；带参数记录当前分支要验证什么 |
 | `/inject` | 自动注入开关：**不带参数就是循环切换**（off→brief→full），也可 `/inject off\|brief\|full`。默认 off，写 `sci/config.json`，立即生效不需重启 |
+| `/inbox` | 投放箱清单：有哪些待处理文件、按扩展名给的建议归属、一句可直接发给模型的处理指令 |
+
+## 投放箱（`inbox/`）
+
+用户在项目根建一个固定位置，把想分享的资料（别人发来的调研报告、文献 PDF、数据表、方案）丢进去；**显式**说一句「处理 inbox」，agent 才去读、分类、移动，并把这块地清空。
+
+```
+inbox/                  ← 人往里扔文件；自带 .gitignore，默认不进版本控制
+├─ README.md            ← 处理规则（给人和模型看）
+└─ .gitignore
+```
+
+处理规则（写进 skill，agent 照做）：
+
+1. 逐个读到"知道它是什么"，PDF 优先 `pdftotext`，其次 `pypdf`；**读不动的不猜**，留在原地并说明。
+2. 按内容判断归属：文献 → `papers/pdf/` + `papers.csv` 登记；报告/综述/方案 → `Plan_Summary/<日期>_<主题>.md`；数据 → `data/`；脚本 → `Experiment/<日期>_<主题>/scripts/`；图 → `figures/`。
+3. **移动而非复制**，并在 `sci/log/<日期>.md` 记一行「原文件名 → 目标路径 → 判定理由」。
+4. 处理完 `inbox/` 只剩 `README.md` 和 `.gitignore`；有剩余必须说明原因。
+
+`/where` 和 `/resume` 都会显示「收件箱：N 个待处理」，所以你不会忘记里面还有东西。
 
 ## 自动部分（模型零配合）
 
@@ -46,8 +66,12 @@ sci/
 ├─ dead-ends.md        # 只追加：试过但不行的路线
 ├─ ledger/<日期>.jsonl # 插件自动写，人不要碰
 ├─ branches.json       # 探索分支树
-├─ config.json         # 注入开关
+├─ config.json         # 注入开关 / 收件箱路径
 └─ state-history/      # STATE.md 每次整体重写前的归档
+
+inbox/                 # 投放箱（人放、agent 处理、处理完清空）
+├─ README.md
+└─ .gitignore
 ```
 
 ## 安装
@@ -61,7 +85,7 @@ Host 半边改动需要重启会话进程（模块热重载按设计忽略 `node
 ## 开发
 
 ```bash
-node test/smoke.mjs   # 35 项：mock Cordis ctx，覆盖门禁/台账/六个命令/分支/注入三档
+node test/smoke.mjs   # 46 项：mock Cordis ctx，覆盖门禁/台账/七个命令/分支/注入三档/收件箱
 ```
 
 设计取舍见 [docs/DESIGN.md](docs/DESIGN.md)。

@@ -1,7 +1,7 @@
 {
   "name": "dsh-personal-science",
-  "version": "0.1.0",
-  "description": "Personal-science layer for DeepSeek Harness: session-injected research state, append-only ledger, dead-ends and branch bookkeeping. Zero new agent tools — the model keeps using native DSH capabilities.",
+  "version": "0.3.0",
+  "description": "Personal-science layer for DeepSeek Harness: sci/ research state, append-only ledger, dead-ends, branch bookkeeping and an inbox/ drop box. Zero new agent tools — the model keeps using native DSH capabilities.",
   "type": "module",
   "license": "MIT",
   "private": true,
