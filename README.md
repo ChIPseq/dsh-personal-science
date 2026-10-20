@@ -88,6 +88,21 @@ Host 半边改动需要重启会话进程（模块热重载按设计忽略 `node
 node test/smoke.mjs   # 46 项：mock Cordis ctx，覆盖门禁/台账/七个命令/分支/注入三档/收件箱
 ```
 
+## 发布
+
+```bash
+node scripts/release.mjs --dry-run           # 只打印计划：版本、tag、Release notes
+node scripts/release.mjs --yes               # 用 package.json 的版本发：tag → push → GitHub Release
+node scripts/release.mjs --bump patch --yes  # 0.3.0 → 0.3.1，自动改 package.json 并提交
+node scripts/release.mjs --notes notes.md --yes
+node scripts/release.mjs --no-release --yes  # 只打 tag + push
+```
+
+它会先校验：在 `main` 上、工作树干净、本地与 `origin/main` 一致、tag 不存在。
+Release notes 默认取上一个 tag 以来的提交；凭据依次读 `GH_TOKEN` / `GITHUB_TOKEN` / `git credential fill`（不落盘、不回显）。
+
+> 用 Node 而不是 PowerShell 发 API 是有原因的：`Invoke-RestMethod` 会把中文 body 按 ISO-8859-1 编码，GitHub 直接回 `Problems parsing JSON`。
+
 设计取舍见 [docs/DESIGN.md](docs/DESIGN.md)。
 
 ## License
