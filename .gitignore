@@ -4,3 +4,5 @@ _analysis/
 *.log
 .DS_Store
 _*.mjs
+# 本地调研稿，不进仓库
+科研Agent*.md
