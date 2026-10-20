@@ -8,6 +8,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import { apply } from '../index.mjs'
+import { RECEIPT_PREFIX, receiptPath } from '../lib/deliver.mjs'
+import { writeConfig } from '../lib/config.mjs'
 
 let pass = 0
 let failed = 0
@@ -80,12 +82,30 @@ function invoke (name, rawInput = '', agentId = 'session-main') {
   if (!def) throw new Error(`command not registered: ${name}`)
   return def.handler({
     commandId: 'c1',
-    agent: { id: agentId },
+    agent: makeAgent(agentId),
     rawInput,
     attachments: [],
     signal: new AbortController().signal
   })
 }
+
+// Command output barely renders in the desktop client, so every result is also
+// delivered into the conversation through the agent's own inbox. The mock
+// records both routes so the tests can assert what the human would actually see.
+const delivered = [] // { agent, mode: 'turn' | 'pending', text }
+function makeAgent (agentId) {
+  return {
+    id: agentId,
+    steer (message) {
+      delivered.push({ agent: agentId, mode: 'turn', text: message.content[0].text, message })
+    },
+    inject (message) {
+      delivered.push({ agent: agentId, mode: 'pending', text: message.content[0].text, message })
+    }
+  }
+}
+const lastDelivery = () => delivered[delivered.length - 1]
+const deliveryCount = () => delivered.length
 
 async function main () {
   console.log('apply()')
@@ -158,6 +178,32 @@ async function main () {
   rmSync(path.join(box, 'matrix.csv'))
   const cleared = await invoke('inbox')
   ok(cleared.text.includes('收件箱（空）'), 'emptying the folder returns to empty')
+
+  console.log('\ndelivery (output that does not depend on the command card)')
+  const inboxReceipt = receiptPath(root, 'inbox')
+  ok(existsSync(inboxReceipt), 'receipt file written under sci/out/')
+  ok(readFileSync(inboxReceipt, 'utf8').includes('收件箱'), 'receipt file carries the report')
+  ok(lastDelivery().mode === 'turn', 'result is delivered by opening one turn')
+  ok(lastDelivery().text.startsWith(RECEIPT_PREFIX), 'delivered row is marked as a receipt')
+  ok(lastDelivery().message.source.kind === 'user', 'receipt rides the only source kind the chat renders')
+  ok(lastDelivery().text.includes('不要移动或修改任何文件'), 'receipt forbids the model from acting on it')
+  const beforeOff = deliveryCount()
+  writeConfig(root, { deliver: 'off' })
+  await invoke('where')
+  ok(deliveryCount() === beforeOff, 'deliver:off suppresses the conversation row')
+  ok(readFileSync(receiptPath(root, 'where'), 'utf8').includes('最近动作'), 'deliver:off still writes the report')
+  writeConfig(root, { deliver: 'pending' })
+  await invoke('where')
+  ok(lastDelivery().mode === 'pending', 'deliver:pending queues the receipt without a turn')
+  writeConfig(root, { deliver: 'turn' })
+  const bareResult = await commands.get('where').handler({
+    commandId: 'c2',
+    agent: { id: 'session-main' },
+    rawInput: '',
+    attachments: [],
+    signal: new AbortController().signal
+  })
+  ok(bareResult.kind === 'success', 'an agent without steer/inject still runs the command')
 
   console.log('\n/wrap')
   const w = await invoke('wrap', '证实了 A')
