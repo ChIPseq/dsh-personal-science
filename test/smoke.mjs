@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 import { apply } from '../index.mjs'
-import { RECEIPT_PREFIX, receiptPath } from '../lib/deliver.mjs'
+import { HIDDEN_SOURCE, RECEIPT_PREFIX, VISIBLE_SOURCE, receiptPath } from '../lib/deliver.mjs'
 import { writeConfig } from '../lib/config.mjs'
 
 let pass = 0
@@ -183,19 +183,20 @@ async function main () {
   const inboxReceipt = receiptPath(root, 'inbox')
   ok(existsSync(inboxReceipt), 'receipt file written under sci/out/')
   ok(readFileSync(inboxReceipt, 'utf8').includes('收件箱'), 'receipt file carries the report')
-  ok(lastDelivery().mode === 'turn', 'result is delivered by opening one turn')
+  ok(lastDelivery().mode === 'pending', 'by default the receipt is queued, not turned into a bubble')
   ok(lastDelivery().text.startsWith(RECEIPT_PREFIX), 'delivered row is marked as a receipt')
-  ok(lastDelivery().message.source.kind === 'user', 'receipt rides the only source kind the chat renders')
+  ok(lastDelivery().message.source.kind === HIDDEN_SOURCE, 'default receipt is hidden context, not a fake user row')
   ok(lastDelivery().text.includes('不要移动或修改任何文件'), 'receipt forbids the model from acting on it')
   const beforeOff = deliveryCount()
   writeConfig(root, { deliver: 'off' })
   await invoke('where')
   ok(deliveryCount() === beforeOff, 'deliver:off suppresses the conversation row')
   ok(readFileSync(receiptPath(root, 'where'), 'utf8').includes('最近动作'), 'deliver:off still writes the report')
-  writeConfig(root, { deliver: 'pending' })
-  await invoke('where')
-  ok(lastDelivery().mode === 'pending', 'deliver:pending queues the receipt without a turn')
   writeConfig(root, { deliver: 'turn' })
+  await invoke('where')
+  ok(lastDelivery().mode === 'turn', 'deliver:turn opens one turn')
+  ok(lastDelivery().message.source.kind === VISIBLE_SOURCE, 'deliver:turn uses the only source kind the chat renders')
+  ok(lastDelivery().text.includes('只做一句话确认'), 'the visible flavour asks for a one-line confirmation')
   const bareResult = await commands.get('where').handler({
     commandId: 'c2',
     agent: { id: 'session-main' },
