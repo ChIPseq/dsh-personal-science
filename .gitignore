@@ -7,3 +7,14 @@ _scratch/
 _*.mjs
 # 本地调研稿，不进仓库
 科研Agent*.md
+
+docs/SuperAgent_technote.*
+
+
+secrets/
+
+# 科研数据：原始/清洗后数据体积大，不进 git（脚本与 manifest 进）
+data/raw/
+data/clean/
+*.jsonl.gz
+*.parquet

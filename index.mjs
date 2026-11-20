@@ -20,6 +20,7 @@ import { readConfig } from './lib/config.mjs'
 import { stateDigest, stateBrief } from './lib/state.mjs'
 import { recordToolResult, todayCounter } from './lib/ledger.mjs'
 import { readBranches, shortId, upsertNode } from './lib/branches.mjs'
+import { nightLine } from './lib/night.mjs'
 import { registerCommands } from './lib/commands.mjs'
 
 export const name = 'personal-science'
@@ -122,12 +123,17 @@ export function apply (ctx) {
         if (l) parts.push(l)
         const b = branchNote(sessions, agent, root)
         if (b) parts.push(b)
+        const nt = nightLine(root)
+        if (nt) parts.push(nt)
         out = parts.join('\n\n')
       } else {
         const parts = [stateBrief(root, cfg.briefChars || 120)]
         const l = ledgerLine(root)
         if (l) parts.push(l)
         const b = branchNote(sessions, agent, root)
+        if (b) parts.push(b)
+        const nt = nightLine(root)
+        if (nt) parts.push(nt)
         out = parts.filter(Boolean).join('\n')
       }
       diag.len = out.length

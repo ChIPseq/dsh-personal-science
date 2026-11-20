@@ -16,7 +16,24 @@
 | `/deadend <…>` | 记一条"试过但不行"的路线（append-only） |
 | `/branch [方向]` | 看探索分支树；带参数记录当前分支要验证什么 |
 | `/inject` | 自动注入开关：**不带参数就是循环切换**（off→brief→full），也可 `/inject off\|brief\|full`。默认 off，写 `sci/config.json`，立即生效不需重启 |
+| `/night` | 长窗口（夜）：`start` 开窗 / `tick --spent <元>` 记花费并判停 / `close --reason …` 收口 / `status` 看状态。写 `sci/night.json`，`brief` 注入里会多一行夜窗状态 |
 | `/inbox` | 投放箱清单：有哪些待处理文件、按扩展名给的建议归属、一句可直接发给模型的处理指令 |
+
+## 长窗口（夜）
+
+科研 agent 最容易丢的不是工具调用，是**时钟**：「窗口还开着、预算没花完、05:40 才停」是时钟上的事实，不是仓库里的事实——压缩一次就没了。所以窗口有文件、有命令、有一行注入：
+
+```bash
+/night start --cap 4.8          # 开窗；写 sci/night.json，并提示排第一个 tick
+/night tick --spent 1.20        # 每代 tick 调用；返回 stop=false / stop=true(cap|time)
+/night close --reason cap       # 收口；cap|time|external|queue_empty，缺理由直接拒绝
+```
+
+- `close` **必须带理由**：`cap` / `time` 是正常收工；`external` / `queue_empty` 会标 `weak`——等于承认这一夜没跑满。
+- `brief` 注入会多一行：`【夜窗 #5】¥1.20/4.8 · 距收窗 6h32m · stop=false`。
+- `/where` 会红字提示两种失控：`STATE.md` 比台账旧 30 分钟以上；夜窗到了停止条件却没 `close`。
+- 插件不知道价格，`--spent` 由调用方（项目脚本）提供；它只负责和上限、时钟比。
+
 
 ## 投放箱（`inbox/`）
 
@@ -125,3 +142,97 @@ Release notes 默认取上一个 tag 以来的提交；凭据依次读 `GH_TOKEN
 ## License
 
 MIT
+
+---
+
+# 本仓内的科研项目：QSAR 泛化审计（「过程即结果」）
+
+> 上面的内容是 **插件层**（personal-science 给 DSH 的科研状态位）；下面描述的是**本仓正在跑的一个真实科研项目**。两层共用这个 git 仓：插件代码在 `lib/`、`scripts/`、`test/`，科研项目在 `dsh-science-x1/`、`Plan_Summary/`、`journal/`、`cost/`。
+
+## 是什么
+
+「过程即结果」是一个**夜研（nightly research）**项目：一个 router 会话（母）在每晚 22:00 派工，一个 worker 子代理（x1）执行，把每一夜的选题、尝试、失败、结论都落成文件。研究对象是一个可证伪的方法学问题：
+
+> **在 ChEMBL 公开数据上，随机分割报告的 QSAR 性能有多少是分割协议泄漏造成的？**
+
+## 为什么做
+
+随机分割是 QSAR 基准的默认做法，但它会把「同骨架/同化学邻域」的分子分到训练集和测试集两侧，导致性能被系统性高估。这件事学界都知道，但缺少**多靶点、可复现、把基线定义讲清楚**的量化审计。这个项目的目标是给出可复查的数字，以及一份「泄漏膨胀该跟什么一起报告」的方法学建议；**负结果同样算结果**（三个假设里有两个被否证）。
+
+## 夜研循环怎么运转
+
+1. **22:00 开工**：母会话读 `dsh-science-x1/sci/STATE.md` 与 `journal/` 最近记录，定今晚 1 个主任务 + 1 个备用，通过 `send_message` 派给 x1（x1 不在则 `subagent` 新建）。
+2. **夜内**：x1 按「先设计后代码」执行——先写 `Experiment/<需求日期>_<主题>/design.md`，再写脚本；每个可判定结论立刻追加 `sci/log/<日期>.md`（`## HH:MM · 标题` 节），并更新 `sci/STATE.md`（≤45 行）；试过不行的路线追加 `sci/dead-ends.md`。
+3. **02:00 巡检**：母查 x1 是否卡住（>20 min 无进展）、是否接近预算，必要时 steer。
+4. **06:00 收工**：母结算 `cost/`、写 `journal/<日期>.md`（100 词摘要 + 关键路径 + 花费）、更新两边 STATE。
+5. **窗口未开**（harness 未启动）则该夜不计入 30 夜——这是用户已知并接受的约束。
+
+## 主结论（一句话）
+
+**在 23 个 ChEMBL 靶点上，随机分割报告的 R² 有约 30%（骨架基线）到 80%（化学邻域基线）是分割协议泄漏：Δ_leak 在 23/23 靶点上为正（scaffold 基线 0.190、Butina 聚类基线 0.519），R² 由随机分割的 0.652 降到骨架 0.462、邻域 0.133；泄漏膨胀与活性悬崖密度无关，与「化学邻域可记忆度」的关系也未能通过外部验证；并且 Δ_leak 本身是数据集骨架冗余度的度量（test 骨架在 train 出现过的比例 22.5%→64.6%），因此报告泄漏时必须同时报告冗余度。**
+
+## 如何复现
+
+```powershell
+$py = 'D:\Software\miniconda3\envs\analysis\python.exe'
+$s  = 'D:\workspace\dsh-science\dsh-science-x1\Experiment\20261107_QSAR-audit\scripts'
+& $py "$s\01_fetch.py"; & $py "$s\02_clean.py"; & $py "$s\03_profile.py"   # 数据（fetch 幂等）
+& $py "$s\10_bench_v2.py"                                                  # 23 靶点 bench（~32 min，可续跑）
+& $py "$s\11_h2_test.py"; & $py "$s\15_h2p_test.py"; & $py "$s\16_h2p_oos.py"  # H2 / H2′
+& $py "$s\18_subsample.py"; & $py "$s\19_subsample_diag.py"                 # H3 + 机制（~55 min）
+& $py "$s\20_h1_family.py"; & $py "$s\21_nrecords_weight.py"                 # 稳健性
+& $py "$s\23_figures.py"; & $py "$s\20_check_numbers.py"                     # 图 + 数字审计
+```
+
+可读稿：`dsh-science-x1/Report/report.md`（含中英摘要、5 张图、口径与限制）。数字审计：`dsh-science-x1/Experiment/20261107_QSAR-audit/results/number_audit.md`。
+
+## 目录导览
+
+```
+dsh-science-x1/                    科研项目（x1 worker 的工作区）
+├─ README.md                       worker 的工作约定（本文件的精简版）
+├─ Report/report.md                报告 v3（可读稿）；Report/figures/ 5 张图
+├─ sci/STATE.md                    当前状态快照（≤45 行）；sci/log/<日期>.md 只追加
+├─ sci/dead-ends.md                死路台账（append-only，13 条）
+├─ Experiment/20261107_QSAR-audit/ 一次实验一个目录
+│  ├─ design.md                    设计 + 夜次修订（含 H2′-rescue 预注册）
+│  ├─ scripts/01–27                全部可重跑脚本
+│  ├─ data/{raw,clean}/            raw JSONL.gz + 清洗后 CSV
+│  └─ results/                     所有数字与表的落地处（profile/bench/h2/h3p/h3b/audit）
+├─ Plan_Summary/                   选题与计划文档
+└─ Plan/NIGHT_PROTOCOL.md          夜研协议（22:00/02:00/06:00）
+
+journal/                           母会话的每日记录 + INDEX.md（夜次索引）
+cost/                              花费台账（update-cost.mjs 结算）
+sci/                               母会话的 sci 状态（与 x1 的一一对应）
+runbooks/                          运维手册（重启恢复 / STOP / 手动补跑 / 成本结算）
+```
+
+## 当前状态（2026-11-13，夜 20）
+
+- **进度**：20/30 夜；累计花费 **¥7.92**（日限 ¥5 与总限 ¥150 均未触及）；中断 1 次（11-11 窗口未开，不计夜次）。
+- **报告**：`dsh-science-x1/Report/report.md` v3（中英摘要 + §1–§10 + §5.5 方法）+ **6 张图**；数字审计 **26/26** 一致。
+- **已定稿结论**：H1（23/23 全正、双基线、R² 链条 0.652→0.462→0.133）、H2 否证、H2′ 外部验证 FAIL、H3 靶点内支持、Δ_leak=骨架冗余度；assay_type 与描述符族稳健性均已完成。
+- **开放项（都只等 ChEMBL API）**：① H2′-rescue（预注册，13 候选已定，脚本 `25→26→27` 就绪）；② 复现抽检的 fetch 环节（`30_repro_check.py`，当前为 PARTIAL）。
+- 详见 `journal/INDEX.md`（夜次时间线）与 `dsh-science-x1/sci/STATE.md`（当前判断）。
+
+## 复盘：这套夜研循环跑起来怎么样（22 夜后）
+
+- **做对的（保留）**：先设计后代码。每夜先写 design.md（清洗口径、分割定义、预注册判定线），再写脚本；结果全部落盘到 
+esults/，并用 20_check_numbers.py 让报告与数字源做 26/26 对账。这套纪律的直接收益是：三个假设里两个被干净否证（H2）、一个被外部验证判 FAIL（H2′），负结果照样能写成有信息量的结论。
+- **踩坑（已固化）**：分组切分里的「任意自由度」会翻结论——scaffold 同尺寸组的排序、Butina 的阈值，前者让单次值与多样本均值差 0.1 R²、后者让 Δ_leak 均值从 0.66 降到 0.38；另有一次 greedy_fill 内部重排导致「5 个 seed 结果完全相同」的假象。对策已写进协议：**分组切分必须报多样本均值 ± swing，并写明阈值**。
+- **最大的成本不是钱**：22 夜累计 ¥7.92（≈¥0.36/夜，远低于 ¥5/夜上限）；真正稀缺的是每晚 2–4 小时的窗口，以及**外部依赖**——ChEMBL API 从夜 14 起间歇性 500，使 rescue 与复现 fetch 两项卡了 9 个夜次。教训：外部依赖要有「降级路径」，并把「方法失败」与「依赖失败」分开记账。
+- **中断**：11-11 窗口未开（不计夜次）；STOP 机制全程未被触发。夜次按「派工段」计数而非日历天，一个窗口内可跑多段（夜 1–9 都在同一个窗口完成）。
+- **可复现性**：独立目录重跑「数据→模型」30/30 项 diff=0.0000；但 fetch 环节因 API 故障仍是 PARTIAL——端到端复现要等 API 恢复后才能补上。
+
+## 预算与窗口约束
+
+- 窗口：每晚 **22:00–06:00**（Asia/Shanghai）；白天不工作（除非母显式派活）。
+- 预算：**每日 ≤ ¥5，总计 ≤ ¥150**，**30 夜**为上限；单命令 ≤10 分钟（长命令走后台作业）；不下载 >1GB；不写密钥。
+- 当前：**20/30 夜**，累计 **¥7.92**（母侧已结算至 11-13）；中断 1 次（11-11 窗口未开，不计夜次）。
+
+## STOP 机制
+
+- 项目根出现 `STOP` 文件 → **母会话跳过一切动作**（不派工、不巡检、不结算），只在 `journal/<日期>.md` 记一行；文件删除后恢复。
+- x1 收到派工后发现 `STOP` 存在 → 不执行，直接写一行记录并结束。
+- 夜间若 x1 卡住 >20 分钟无进展，母用 `send_message` steer「收尾或继续」；x1 收尾时必须先落盘 STATE + 日志，再结束回合。

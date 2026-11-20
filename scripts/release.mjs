@@ -226,11 +226,11 @@ async function main () {
   if (args.dryRun) {
     if (tagBlocked) info(`⚠ tag ${tag} 已存在 —— 真跑会被拦下，先 --bump 或用新版本号`)
     if (!bumped) {
-      try {
-        assertClean()
-      } catch {
-        info('⚠ 工作树不干净')
-      }
+      // `assertClean()` reports through `fail()`, which calls process.exit(1):
+      // it is not catchable, so the old try/catch here never ran and a dirty
+      // dry run died before printing the notes (issue #1). Probe git directly.
+      const dirty = git('status', '--porcelain')
+      if (dirty) info('⚠ 工作树不干净（dry-run 继续；真跑会被拦下，先提交或 stash）')
     }
   } else {
     if (tagBlocked) fail(`tag ${tag} 已存在`)
