@@ -49,6 +49,7 @@ try {
   writeFileSync(path.join(repo, 'README.md'), '# fixture\n')
   mkdirSync(path.join(repo, 'scripts'))
   copyFileSync(fileURLToPath(new URL('../scripts/release.mjs', import.meta.url)), path.join(repo, 'scripts', 'release.mjs'))
+  copyFileSync(fileURLToPath(new URL('../scripts/verify.mjs', import.meta.url)), path.join(repo, 'scripts', 'verify.mjs'))
   git('add', '.')
   git('commit', '-q', '-m', 'init')
   git('remote', 'add', 'origin', 'git@github.com:fixture/fixture.git')
@@ -66,6 +67,26 @@ try {
   ok(dirty.code === 0, 'dirty dry run exits 0 instead of 1')
   ok(dirty.stdout.includes('工作树不干净'), 'dirty dry run warns about the working tree')
   ok(dirty.stdout.includes('以下是会用的 notes'), 'dirty dry run still prints the notes')
+
+  console.log('\nverification gate (no CHANGELOG -> warning, real run blocked)')
+  ok(dirty.stdout.includes('缺少验证字段') || dirty.stdout.includes('CHANGELOG.md'), 'dry run warns that the verification fields are missing')
+
+  console.log('\nverification gate (CHANGELOG present -> passes)')
+  writeFileSync(path.join(repo, 'CHANGELOG.md'), [
+    '# CHANGELOG',
+    '',
+    '## 0.0.1 — 2026-11-24',
+    '',
+    '- **观察**：fixture',
+    '- **改动**：fixture',
+    '- **指标**：fixture',
+    '- **判据**：fixture',
+    '- **读取日期**：2026-12-01',
+    ''
+  ].join('\n'))
+  const gated = runDry()
+  ok(gated.code === 0, 'dry run with a complete CHANGELOG exits 0')
+  ok(gated.stdout.includes('验证字段齐全'), 'dry run reports the verification fields as complete')
 } finally {
   rmSync(repo, { recursive: true, force: true })
 }

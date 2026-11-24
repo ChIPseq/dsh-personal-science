@@ -225,6 +225,12 @@ async function main () {
   ok(de.kind === 'success', '/deadend succeeds')
   ok(readFileSync(path.join(root, 'sci', 'dead-ends.md'), 'utf8').includes('循环论证'), 'dead-end row appended')
 
+  console.log('\ndead-ends in injection (P-04)')
+  await invoke('inject', 'brief')
+  const dDead = await render()
+  ok(dDead.includes('【死路】'), 'brief injection carries the recent dead-ends line')
+  ok(dDead.includes('循环论证'), 'the dead-end line carries the entry text')
+
   console.log('\n/branch')
   const b1 = await invoke('branch', '验证顺式 vs 反式归因')
   ok(b1.kind === 'success', '/branch with direction succeeds')

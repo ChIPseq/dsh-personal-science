@@ -17,6 +17,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { checkChangelog, describe } from './verify.mjs'
 import path from 'node:path'
 import process from 'node:process'
 
@@ -240,6 +241,14 @@ async function main () {
   const notes = args.notes
     ? readFileSync(path.resolve(ROOT, args.notes), 'utf8').trim()
     : generatedNotes(tag, previousTag())
+
+  const gate = checkChangelog(ROOT, version)
+  if (!gate.ok) {
+    if (args.dryRun) info(`⚠ ${describe(version, gate)}（dry-run 继续；真跑会被拦下）`)
+    else fail(describe(version, gate))
+  } else {
+    info(`✓ ${describe(version, gate)}`)
+  }
 
   if (args.dryRun) {
     console.log(`\n-- dry-run：以下是会用的 notes --\n\n${notes}\n`)

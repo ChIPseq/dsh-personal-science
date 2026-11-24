@@ -21,6 +21,7 @@ import { stateDigest, stateBrief } from './lib/state.mjs'
 import { recordToolResult, todayCounter } from './lib/ledger.mjs'
 import { readBranches, shortId, upsertNode } from './lib/branches.mjs'
 import { nightLine } from './lib/night.mjs'
+import { deadEndsLine } from './lib/deadends.mjs'
 import { registerCommands } from './lib/commands.mjs'
 
 export const name = 'personal-science'
@@ -125,6 +126,8 @@ export function apply (ctx) {
         if (b) parts.push(b)
         const nt = nightLine(root)
         if (nt) parts.push(nt)
+        const de = deadEndsLine(root)
+        if (de) parts.push(de)
         out = parts.join('\n\n')
       } else {
         const parts = [stateBrief(root, cfg.briefChars || 120)]
@@ -134,6 +137,8 @@ export function apply (ctx) {
         if (b) parts.push(b)
         const nt = nightLine(root)
         if (nt) parts.push(nt)
+        const de = deadEndsLine(root)
+        if (de) parts.push(de)
         out = parts.filter(Boolean).join('\n')
       }
       diag.len = out.length
