@@ -1,6 +1,6 @@
 {
   "name": "dsh-personal-science",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Personal-science layer for DeepSeek Harness: sci/ research state, append-only ledger, dead-ends, branch bookkeeping, an inbox/ drop box and a long-window (night) budget clock. Zero new agent tools — the model keeps using native DSH capabilities.",
   "type": "module",
   "license": "MIT",

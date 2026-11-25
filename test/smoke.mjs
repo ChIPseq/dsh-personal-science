@@ -286,6 +286,17 @@ async function main () {
   const nf2 = JSON.parse(readFileSync(nightFile, 'utf8'))
   ok(nf2.night === 2, 'night number increments')
 
+  console.log('\n/night close consistency (0.4.2)')
+  await invoke('night', 'start --cap 4.8')
+  const badCap = await invoke('night', 'close --reason cap')
+  ok(badCap.kind === 'error' && badCap.text.includes('cap 要求'), 'close cap before spending is refused')
+  const badTime = await invoke('night', 'close --reason time')
+  ok(badTime.kind === 'error' && badTime.text.includes('time 要求'), 'close time before 05:40 is refused')
+  const tickToCap = await invoke('night', 'tick --spent 4.9')
+  ok(tickToCap.text.includes('stop=true（cap）'), 'tick to the cap reports stop=cap')
+  const goodCap = await invoke('night', 'close --reason cap')
+  ok(goodCap.kind === 'success', 'close cap after reaching the cap succeeds')
+
   console.log('\nother project stays untouched')
   ok((await render('session-other')) === '', 'unrelated project injects nothing')
   ok(!existsSync(path.join(otherRoot, 'sci')), 'unrelated project gets no files')
