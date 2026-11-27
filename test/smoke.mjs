@@ -297,6 +297,16 @@ async function main () {
   const goodCap = await invoke('night', 'close --reason cap')
   ok(goodCap.kind === 'success', 'close cap after reaching the cap succeeds')
 
+  console.log('\n/night evidence_complete (0.4.3)')
+  await invoke('night', 'start --cap 4.8')
+  const noEv = await invoke('night', 'close --reason evidence_complete')
+  ok(noEv.kind === 'error' && noEv.text.includes('--evidence'), 'evidence_complete without a file is refused')
+  writeFileSync(path.join(root, 'closure.md'), '# closure\n\nE1 pass\nE2 pass\nE3 pass\nE4 pass\nE5 pass\nE6 pass\n')
+  const goodEv = await invoke('night', 'close --reason evidence_complete --evidence closure.md')
+  ok(goodEv.kind === 'success', 'evidence_complete with a checklist closes successfully')
+  ok(!goodEv.text.includes('weak'), 'evidence_complete is not marked weak')
+  ok(goodEv.text.includes('进入写作'), 'evidence_complete tells the caller to start writing')
+
   console.log('\nother project stays untouched')
   ok((await render('session-other')) === '', 'unrelated project injects nothing')
   ok(!existsSync(path.join(otherRoot, 'sci')), 'unrelated project gets no files')
