@@ -40,6 +40,7 @@ const ALLOWED = [
   'test',
   'docs/DESIGN.md',
   'scripts/release.mjs',
+  'scripts/night.mjs',
   'scripts/publish.mjs'
 ]
 
