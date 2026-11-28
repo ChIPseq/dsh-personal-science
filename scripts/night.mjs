@@ -40,7 +40,7 @@ if (cmd === 'start') {
   const night = openNight(root, { cap: flag('cap'), spent: flag('spent') })
   console.log(`night #${night.night} open: ${night.since} -> ${clock((endOf(night) - new Date(night.since)) / 60000)}`)
   console.log(`cap ¥${Number(night.cap_cny).toFixed(2)}; file ${nightPath(root)}`)
-  console.log('next: every tick run  node scripts/night.mjs tick --spent <window-check 的 spent>')
+  console.log('next: every tick run  node night.mjs tick --spent <window-check 的 spent>')
   process.exit(0)
 }
 
@@ -50,7 +50,7 @@ if (cmd === 'tick') {
   const { night, decision } = out
   console.log(`spent ¥${decision.spent.toFixed(2)}/¥${Number(decision.cap).toFixed(2)}  left ${clock(decision.minutesLeft)}  stop=${decision.stop}${decision.stop ? ` (${decision.reason})` : ''}`)
   if (decision.stop) {
-    console.log(`next: close now -> node scripts/night.mjs close --reason ${decision.reason} --spent ${decision.spent.toFixed(2)}`)
+    console.log(`next: close now -> node night.mjs close --reason ${decision.reason} --spent ${decision.spent.toFixed(2)}`)
     process.exit(0)
   }
   console.log('next: keep dispatching; recreate the next tick')
