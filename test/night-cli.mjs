@@ -53,6 +53,14 @@ try {
   ok(withEv.code === 0, 'evidence_complete with a checklist succeeds')
   ok(withEv.stdout.includes('start writing'), 'evidence_complete tells the agent to start writing')
 
+  console.log('budget_exhausted (0.4.5)')
+  run('start', '--cap', '4.8')
+  const tooLow = run('close', '--reason', 'budget_exhausted', '--spent', '3.0')
+  ok(tooLow.code === 1, 'budget_exhausted below 95% of cap is refused')
+  const nearCap = run('close', '--reason', 'budget_exhausted', '--spent', '4.62')
+  ok(nearCap.code === 0, 'budget_exhausted at 96% of cap succeeds')
+  ok(!nearCap.stdout.includes('WEAK'), 'budget_exhausted is not marked weak (efficiency is not a failure)')
+
   console.log('status')
   const status = run('status')
   ok(status.code === 0 && status.stdout.includes('closed'), 'status reports the closed window')
